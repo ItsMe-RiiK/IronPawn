@@ -12,7 +12,7 @@ permissions:
   contents: write
 
 jobs:
-  build:
+  build_windows:
     name: Build Windows (${{ matrix.arch }})
     runs-on: windows-latest
     strategy:
@@ -48,12 +48,42 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: IronPawn-Windows-${{ matrix.arch }}
-        path: |
-          build/Release/IronPawn-Windows-${{ matrix.arch }}.exe
+        path: build/Release/IronPawn-Windows-${{ matrix.arch }}.exe
+
+  build_linux:
+    name: Build Linux (x64)
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up CMake
+      uses: lukka/get-cmake@latest
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libcurl4-openssl-dev nlohmann-json3-dev
+
+    - name: Configure CMake
+      run: cmake -B build -S .
+
+    - name: Build
+      run: cmake --build build --config Release
+
+    - name: Archive executable
+      run: |
+        cd build
+        tar -czvf IronPawn-Linux-x64.tar.gz IronPawn
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: IronPawn-Linux-x64
+        path: build/IronPawn-Linux-x64.tar.gz
 
   release:
     name: Create Release
-    needs: build
+    needs: [build_windows, build_linux]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     steps:
@@ -66,4 +96,6 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          files: artifacts/IronPawn-Windows-*.exe
+          files: |
+            artifacts/IronPawn-Windows-*.exe
+            artifacts/IronPawn-Linux-*.tar.gz
