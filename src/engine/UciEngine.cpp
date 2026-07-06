@@ -269,11 +269,23 @@ std::string UciEngine::getBestMove(const std::string &position, int movetimeMs, 
   }
   sendCommand(goCommand);
 
+  int emptyCount = 0;
+
   while (true)
   {
     std::string line = readLine();
     if (line.empty())
+    {
+      emptyCount++;
+      if (emptyCount > 1000)
+      {
+        std::cerr << "Engine Stopped responding" << std::endl;
+        break;
+      }
       continue;
+    }
+
+    emptyCount = 0;
 
     if (line.find("bestmove") == 0)
     {
