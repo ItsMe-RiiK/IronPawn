@@ -10,7 +10,7 @@ int main(int argc, char *argv[])
 
   // Method 3: Hardcode in Source Code
   // You can permanently write your Lichess API token here so you don't have to pass it in the terminal.
-  std::string token = "LICHESS_BOT_TOKEN";
+  std::string token = "YOUR_LICHESS_BOT_TOKEN_HERE";
   // The path to your stockfish executable. "stockfish" works if it's already installed in your system PATH.
   std::string enginePath = "stockfish";
 
