@@ -1,0 +1,29 @@
+{
+  // Lichess Bot Configuration
+  // If you don't want to run the Lichess bot, leave the token empty ("")
+  "lichess": {
+    "token": ""
+  },
+  // Discord Bot Configuration
+  // If you don't want to run the Discord bot, leave the token empty ("")
+  // Note: The Local Web GUI requires Discord platform to run (or falls back to localhost only)
+  "discord": {
+    "token": ""
+  },
+  // Global Engine Settings (Stockfish)
+  // Note: For Discord and Web GUI, the ELO is dynamically chosen in the browser.
+  // For Lichess, challenges will automatically fall back to the ELO defined here.
+  "engine": {
+    "path": "stockfish",
+    // ELO: Min 1320, Max 3190
+    "elo": 1500, // Base ELO difficulty (used for Lichess)
+    // Recommendations for time/depth limits:
+    // - Blitz (Fast): thinkTimeMs: 100-500, depth: 10-15
+    // - Rapid (Medium): thinkTimeMs: 1000-3000, depth: 15-20
+    // - Classic (Strong): thinkTimeMs: 5000+, depth: 20-24
+    // thinkTimeMs: Min 1, Max unbounded. Higher time = stronger play but slower response.
+    "thinkTimeMs": 1000, // Think time per move in milliseconds
+    // depth: Min 1, Max 245. Higher depth = looks further ahead.
+    "depth": 15 // Max search depth for the engine
+  }
+}
