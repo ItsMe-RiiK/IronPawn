@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IronPawn | Local Engine GUI</title>
+    <link rel="stylesheet" href="./chessboard-1.0.0.min.css">
+    <style>
+        body {
+            background: linear-gradient(135deg, #1e1e24, #151518);
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            text-align: center;
+        }
+
+        h1 {
+            margin-top: 0;
+            font-weight: 300;
+            letter-spacing: 2px;
+            color: #f0f0f0;
+        }
+
+        #board {
+            width: 400px;
+            margin: 0 auto;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+        }
+
+        .controls {
+            margin-top: 20px;
+        }
+
+        button {
+            background: linear-gradient(90deg, #4b6cb7 0%, #182848 100%);
+            border: none;
+            color: white;
+            padding: 10px 25px;
+            text-transform: uppercase;
+            border-radius: 30px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(75, 108, 183, 0.4);
+        }
+
+        #status {
+            margin-top: 15px;
+            font-size: 0.9em;
+            color: #aaa;
+        }
+
+        .highlight-square {
+            background-color: rgba(255, 255, 0, 0.4) !important;
+            box-shadow: inset 0 0 15px rgba(255, 255, 0, 0.6) !important;
+        }
+
+        .valid-move {
+            position: relative;
+        }
+
+        .valid-move::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 25%;
+            height: 25%;
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 50%;
+            pointer-events: none;
+        }
+
+        .valid-capture {
+            position: relative;
+        }
+
+        .valid-capture::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80%;
+            height: 80%;
+            border: 6px solid rgba(0, 0, 0, 0.2);
+            border-radius: 50%;
+            pointer-events: none;
+        }
+
+        .in-check {
+            background: radial-gradient(ellipse at center, rgba(255, 0, 0, 0.8) 0%, rgba(231, 0, 0, 0.8) 25%, rgba(169, 0, 0, 0) 89%, rgba(158, 0, 0, 0) 100%) !important;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <h1>IRONPAWN</h1>
+        <div id="board"></div>
+        <div class="controls">
+            <div style="display: flex; gap: 15px; margin-bottom: 15px; align-items: center; justify-content: center; color: #fff;">
+                <label style="font-weight: bold;">Team: 
+                    <select id="playerSide" style="padding: 5px; border-radius: 4px; border: none;">
+                        <option value="white">White</option>
+                        <option value="black">Black</option>
+                        <option value="random">Random</option>
+                    </select>
+                </label>
+                <label style="display: flex; align-items: center; gap: 10px; font-weight: bold;">Stockfish ELO: 
+                    <span id="eloValue" style="min-width: 40px; text-align: right;">1500</span>
+                    <input type="range" id="eloSlider" min="1320" max="3190" value="1500" style="cursor: pointer;">
+                </label>
+            </div>
+            <div style="display: flex; gap: 10px; justify-content: center;">
+                <button id="newGameBtn">New Game</button>
+                <button id="resignBtn">Resign</button>
+            </div>
+            <div id="status">Status: Waiting to start...</div>
+        </div>
+    </div>
+
+    <script src="./jquery-3.5.1.min.js"></script>
+    <script src="./chess.min.js"></script>
+    <script src="./chessboard-1.0.0.min.js"></script>
+    <script type="module">
+        import { DiscordSDK } from "./discord-sdk.js";
+
+        var board = null;
+        var game = new Chess();
+        var pollInterval = null;
+        var selectedSquare = null;
+        var gameActive = false;
+        var isAnimating = false;
+        var animatingSince = 0;
+
+        const params = new URLSearchParams(window.location.search);
+        let gameId = params.get('gameId') || "local_web";
+        const fenParam = params.get('fen');
+        const movesParam = params.get('moves');
+        const isScreenshot = params.has('screenshot');
+
+        if (isScreenshot) {
+            $('h1').hide();
+            $('.controls').hide();
+        }
+
+        var soundMove = new Audio('./audio/move-self.mp3');
+        var soundCapture = new Audio('./audio/capture.mp3');
+        var soundCheck = new Audio('./audio/move-check.mp3');
+        var soundIllegal = new Audio('./audio/illegal.mp3');
+        var soundGameEnd = new Audio('./audio/game-end.mp3');
+
+        function playSound(moveObj, gameObj) {
+            let snd = null;
+            if (gameObj.game_over()) {
+                snd = soundGameEnd;
+            } else if (gameObj.in_check()) {
+                snd = soundCheck;
+            } else if (moveObj && (moveObj.flags.indexOf('c') !== -1 || moveObj.flags.indexOf('e') !== -1)) {
+                snd = soundCapture;
+            } else {
+                snd = soundMove;
+            }
+
+            if (snd) {
+                snd.currentTime = 0; // Reset time to allow overlapping sounds during fast/pre-moves
+                snd.play().catch(e => { });
+            }
+        }
+
+        function unlockUI() {
+            document.getElementById('playerSide').disabled = false;
+            document.getElementById('eloSlider').disabled = false;
+        }
+
+        function checkGameOver() {
+            if (game.game_over()) {
+                gameActive = false;
+                unlockUI();
+                if (game.in_checkmate()) {
+                    $('#status').text("Game Over: Checkmate!");
+                } else {
+                    $('#status').text("Game Over: Draw!");
+                }
+            }
+        }
+
+        function highlightCheck() {
+            $('#board .square-55d63').removeClass('in-check');
+            if (game.in_check()) {
+                var turn = game.turn();
+                var pieces = game.board(); // 8x8 array
+                for (var r = 0; r < 8; r++) {
+                    for (var c = 0; c < 8; c++) {
+                        if (pieces[r][c] && pieces[r][c].type === 'k' && pieces[r][c].color === turn) {
+                            var file = String.fromCharCode(97 + c);
+                            var rank = 8 - r;
+                            var square = file + rank;
+                            $('#board .square-' + square).addClass('in-check');
+                        }
+                    }
+                }
+            }
+        }
+
+        function removeHighlight() {
+            $('#board .square-55d63').removeClass('highlight-square');
+            $('#board .square-55d63').removeClass('valid-move');
+            $('#board .square-55d63').removeClass('valid-capture');
+        }
+
+        function showLegalMoves(square) {
+            var moves = game.moves({
+                square: square,
+                verbose: true
+            });
+            if (moves.length === 0) return;
+            for (var i = 0; i < moves.length; i++) {
+                var move = moves[i];
+                if (move.flags.indexOf('c') !== -1 || move.flags.indexOf('e') !== -1) {
+                    $('#board .square-' + move.to).addClass('valid-capture');
+                } else {
+                    $('#board .square-' + move.to).addClass('valid-move');
+                }
+            }
+        }
+
+        function onDragStart(source, piece, position, orientation) {
+            if (!gameActive) return false;
+            if (game.game_over()) return false;
+            var rawSide = document.getElementById('playerSide').value;
+            var humanColor = (rawSide === 'random') ? (board.orientation() === 'white' ? 'w' : 'b') : (rawSide === 'white' ? 'w' : 'b');
+            if (piece.charAt(0) !== humanColor) return false;
+
+            isAnimating = true;
+            animatingSince = Date.now();
+            removeHighlight();
+            $('#board .square-' + source).addClass('highlight-square');
+            showLegalMoves(source);
+        }
+
+        function onDrop(source, target) {
+            if (source === target) {
+                // This was just a tap/click, do not process as a drag
+                isAnimating = false;
+                return false;
+            }
+
+            removeHighlight();
+            selectedSquare = null;
+
+            var rawSide = document.getElementById('playerSide').value;
+            var humanColor = (rawSide === 'random') ? (board.orientation() === 'white' ? 'w' : 'b') : (rawSide === 'white' ? 'w' : 'b');
+            if (game.turn() !== humanColor) {
+                soundIllegal.play().catch(e => { });
+                return 'snapback';
+            }
+
+            var move = game.move({
+                from: source,
+                to: target,
+                promotion: 'q'
+            });
+
+            if (move === null) {
+                soundIllegal.play().catch(e => { });
+                return 'snapback'; // Invalid move
+            }
+
+            isAnimating = true; // Block pollBot until snapEnd
+            animatingSince = Date.now();
+
+            playSound(move, game);
+            highlightCheck();
+            checkGameOver();
+
+            let engineMove = source + target; // e.g., e2e4
+            if (move.promotion) engineMove += move.promotion;
+
+            $('#status').text("Status: Stockfish is thinking...");
+
+            fetch('/api/move', {
+                method: 'POST',
+                body: JSON.stringify({ move: engineMove, gameId: gameId })
+            });
+        }
+
+        function onSnapEnd() {
+            // Must pass false here! The piece was already dragged, animating it again causes a ghost clone.
+            board.position(game.fen(), false);
+            isAnimating = false;
+        }
+
+        window.startGame = function() {
+            try {
+                var elo = parseInt(document.getElementById('eloSlider').value);
+                var rawSide = document.getElementById('playerSide').value;
+                var side = rawSide;
+                if (side === 'random') {
+                    side = Math.random() < 0.5 ? 'white' : 'black';
+                }
+                var isWhite = (side === 'white');
+
+                game.reset();
+                board.position('start', false);
+                board.orientation(side);
+                document.getElementById('playerSide').disabled = true;
+                document.getElementById('eloSlider').disabled = true;
+                highlightCheck();
+                gameActive = true;
+                $('#status').text("Status: " + (isWhite ? "Your turn (White)" : "Stockfish is thinking (Black)...") + " [Click Registered!]");
+
+                fetch('/api/start', { 
+                    method: 'POST',
+                    body: JSON.stringify({ gameId: gameId, elo: elo, isWhite: isWhite })
+                }).then(() => {
+                    selectedSquare = null;
+                    isAnimating = false;
+                    removeHighlight();
+                    if (pollInterval) clearInterval(pollInterval);
+                    pollInterval = setInterval(pollBot, 500);
+                }).catch(e => {
+                    $('#status').text("Fetch Error: " + e.message);
+                });
+            } catch (e) {
+                $('#status').text("JS Error: " + e.message);
+            }
+        }
+
+        document.getElementById('newGameBtn').addEventListener('click', window.startGame);
+
+        // Add Tap-to-Move functionality using Capture Phase
+        document.getElementById('board').addEventListener('mousedown', function (e) {
+            if (!gameActive) return;
+            if (game.game_over()) return;
+
+            var square = e.target.getAttribute('data-square');
+            if (!square) {
+                var squareEl = e.target.closest('.square-55d63');
+                if (squareEl) square = squareEl.getAttribute('data-square');
+            }
+
+            if (!square) return;
+
+            if (selectedSquare === null) {
+                // Select the piece if it belongs to human
+                var piece = game.get(square);
+                var rawSide = document.getElementById('playerSide').value;
+                var humanColor = (rawSide === 'random') ? (board.orientation() === 'white' ? 'w' : 'b') : (rawSide === 'white' ? 'w' : 'b');
+                if (piece && piece.color === humanColor) {
+                    selectedSquare = square;
+                    removeHighlight();
+                    $('#board .square-' + square).addClass('highlight-square');
+                    showLegalMoves(square);
+                }
+            } else {
+                if (square === selectedSquare) {
+                    // Clicked the same piece again to deselect
+                    selectedSquare = null;
+                    removeHighlight();
+                    return;
+                }
+
+                // Check if they tapped another human piece to change selection
+                var piece = game.get(square);
+                var rawSide = document.getElementById('playerSide').value;
+                var humanColor = (rawSide === 'random') ? (board.orientation() === 'white' ? 'w' : 'b') : (rawSide === 'white' ? 'w' : 'b');
+                if (piece && piece.color === humanColor) {
+                    selectedSquare = square;
+                    removeHighlight();
+                    $('#board .square-' + square).addClass('highlight-square');
+                    showLegalMoves(square);
+                    return;
+                }
+
+                // If not, it's an attempted move! Check turn.
+                if (game.turn() !== humanColor) {
+                    soundIllegal.play().catch(e => { });
+                    selectedSquare = null;
+                    removeHighlight();
+                    return;
+                }
+
+                // Attempt to move
+                var move = game.move({
+                    from: selectedSquare,
+                    to: square,
+                    promotion: 'q'
+                });
+
+                if (move !== null) {
+                    // Valid move!
+                    e.stopPropagation(); // Prevent chessboard.js from drag interference
+                    e.preventDefault();
+
+                    removeHighlight();
+                    isAnimating = true;
+                    animatingSince = Date.now();
+                    board.move(selectedSquare + '-' + square); // Prevent ghost piece glitch by explicit move
+                    setTimeout(function() { 
+                        board.position(game.fen(), false); // Ensure accurate final state (e.g., promotions)
+                        isAnimating = false; 
+                    }, 250);
+
+                    playSound(move, game);
+                    highlightCheck();
+                    checkGameOver();
+                    let engineMove = selectedSquare + square;
+                    if (move.promotion) engineMove += move.promotion;
+
+                    $('#status').text("Status: Stockfish is thinking...");
+                    fetch('/api/move', { method: 'POST', body: JSON.stringify({ move: engineMove, gameId: gameId }) });
+                    selectedSquare = null;
+                } else {
+                    // Clicked an empty/enemy square that is invalid, deselect
+                    soundIllegal.play().catch(e => { });
+                    selectedSquare = null;
+                    removeHighlight();
+                }
+            }
+        }, true); // Use capture phase!
+
+        function pollBot() {
+            fetch('/api/status?gameId=' + gameId)
+                .then(r => r.json())
+                .then(data => {
+                    if (data.latestBotMove && data.latestBotMove !== "") {
+                        let m = data.latestBotMove;
+                        let from = m.substring(0, 2);
+                        let to = m.substring(2, 4);
+                        let promo = m.length > 4 ? m[4] : undefined;
+
+                        if (isAnimating && Date.now() - animatingSince > 1000) {
+                            isAnimating = false; // Failsafe unlock
+                        }
+
+                        // Only apply if it's actually the bot's turn to prevent double applying
+                        var rawSide = document.getElementById('playerSide').value;
+                        var botColor = (rawSide === 'random') ? (board.orientation() === 'white' ? 'b' : 'w') : (rawSide === 'white' ? 'b' : 'w');
+                        if (game.turn() === botColor && !isAnimating) {
+                            var botMove = game.move({ from: from, to: to, promotion: promo });
+                            if (botMove !== null) {
+                                isAnimating = true;
+                                board.move(from + '-' + to); // Explicit move prevents ghost pieces
+                                setTimeout(function() { 
+                                    board.position(game.fen(), false); // Sync exact FEN safely
+                                    isAnimating = false; 
+                                }, 250);
+                                playSound(botMove, game);
+                                highlightCheck();
+                                $('#status').text("Status: Your turn");
+                                checkGameOver();
+                            }
+                        }
+                    }
+                });
+        }
+
+        function initializeGame() {
+            var config = {
+                pieceTheme: './img/chesspieces/wikipedia/{piece}.png',
+                draggable: !isScreenshot,
+                position: fenParam ? fenParam : 'start',
+                moveSpeed: 200,
+                snapbackSpeed: 1, // Must be 1, 0 is falsy and reverts to default 200ms!
+                snapSpeed: 100,
+                onDragStart: onDragStart,
+                onDrop: onDrop,
+                onSnapEnd: onSnapEnd
+            };
+            board = Chessboard('board', config);
+
+            if (fenParam) {
+                game.load(fenParam);
+                highlightCheck();
+                board.position(game.fen(), false);
+            } else if (movesParam) {
+                let moves = movesParam.split(" ");
+                for (let m of moves) {
+                    if (m === "") continue;
+                    let from = m.substring(0, 2);
+                    let to = m.substring(2, 4);
+                    let promo = m.length > 4 ? m[4] : undefined;
+                    game.move({ from: from, to: to, promotion: promo });
+                }
+                highlightCheck();
+                board.position(game.fen(), false);
+            }
+
+            if (!isScreenshot) {
+                // On page load, attempt to restore an active game
+                fetch('/api/status?gameId=' + gameId)
+                    .then(r => r.json())
+                    .then(data => {
+                    if (data.currentMoves && data.currentMoves !== "") {
+                        gameActive = true;
+                        let moves = data.currentMoves.split(" ");
+                        game.reset();
+                        for (let m of moves) {
+                            if (m === "") continue;
+                            let from = m.substring(0, 2);
+                            let to = m.substring(2, 4);
+                            let promo = m.length > 4 ? m[4] : undefined;
+                            game.move({ from: from, to: to, promotion: promo });
+                        }
+                        board.position(game.fen(), false);
+                        highlightCheck();
+                        checkGameOver();
+                        
+                        document.getElementById('playerSide').disabled = true;
+                        document.getElementById('eloSlider').disabled = true;
+
+                        if (gameActive) {
+                            var rawSide = document.getElementById('playerSide').value;
+                            var botColor = (rawSide === 'random') ? (board.orientation() === 'white' ? 'b' : 'w') : (rawSide === 'white' ? 'b' : 'w');
+                            if (game.turn() === botColor) {
+                                $('#status').text("Status: Stockfish is thinking...");
+                            } else {
+                                $('#status').text("Status: Game restored. Your turn.");
+                            }
+                        }
+
+                        isAnimating = false;
+                        if (pollInterval) clearInterval(pollInterval);
+                        pollInterval = setInterval(pollBot, 500);
+                    } else {
+                        $('#status').text("Status: Click 'New Game' to start!");
+                    }
+                });
+            }
+        }
+
+        async function initDiscord() {
+            try {
+                const configRes = await fetch('/api/config');
+                const config = await configRes.json();
+                
+                if (config.clientId) {
+                    const discordSdk = new DiscordSDK(config.clientId);
+                    await discordSdk.ready();
+                    if (discordSdk.channelId) {
+                        gameId = discordSdk.channelId;
+                    } else if (discordSdk.instanceId) {
+                        gameId = discordSdk.instanceId;
+                    }
+                }
+            } catch (e) {
+                console.log("Failed to fetch config or initialize SDK.", e);
+                // Fallback display
+                document.getElementById('status').innerText = "Status: SDK Initialization failed. " + e.toString();
+            }
+            
+            initializeGame();
+        }
+
+        document.getElementById('eloSlider').addEventListener('input', function(e) {
+            document.getElementById('eloValue').innerText = e.target.value;
+        });
+
+        document.getElementById('resignBtn').addEventListener('click', function() {
+            if (gameActive) {
+                gameActive = false;
+                $('#status').text("Status: You resigned. Change settings or click New Game.");
+                unlockUI();
+            }
+        });
+
+        initDiscord();
+    </script>
+</body>
+
+</html>
