@@ -1,58 +1,100 @@
 #include "bot/Bot.h"
+#include "platform/DiscordPlatform.h"
+#include "platform/LichessPlatform.h"
+#include "platform/LocalWebPlatform.h"
 
-#include <cstdlib>
+#include <fstream>
 #include <iostream>
+#include <nlohmann/json.hpp>
 #include <string>
+#include <thread>
+#include <vector>
+
+using json = nlohmann::json;
 
 int main(int argc, char *argv[])
 {
-  // --- CONFIGURATION ---
+  (void)argc;
+  (void)argv;
 
-  // Method 3: Hardcode in Source Code
-  // You can permanently write your Lichess API token here so you don't have to pass it in the terminal.
-  std::string token = "YOUR_LICHESS_BOT_TOKEN_HERE";
-  // The path to your stockfish executable. "stockfish" works if it's already installed in your system PATH.
+  std::string lichessToken = "";
+  std::string discordToken = "";
   std::string enginePath = "stockfish";
 
-  // Method 2: Environment Variables
-  // (This will automatically override the hardcoded token above if they exist)
-  const char *envToken = std::getenv("LICHESS_BOT_TOKEN");
-  if (envToken)
+  int elo = 1500;
+  int thinkTimeMs = 1000;
+  int depth = 15;
+
+  std::ifstream f("config.jsonc");
+  if (!f.is_open())
   {
-    token = envToken;
+    std::cerr << "Warning: config.jsonc not found! Please copy config.example.jsonc to config.jsonc and add your tokens." << std::endl;
+  }
+  else
+  {
+    try
+    {
+      // 4th parameter `true` enables parsing comments (// and /* */) in JSON
+      json config = json::parse(f, nullptr, true, true);
+      if (config.contains("lichess") && config["lichess"].contains("token"))
+      {
+        lichessToken = config["lichess"]["token"];
+      }
+      if (config.contains("discord") && config["discord"].contains("token"))
+      {
+        discordToken = config["discord"]["token"];
+      }
+      if (config.contains("engine"))
+      {
+        if (config["engine"].contains("path"))
+          enginePath = config["engine"]["path"];
+        if (config["engine"].contains("elo"))
+          elo = config["engine"]["elo"];
+        if (config["engine"].contains("thinkTimeMs"))
+          thinkTimeMs = config["engine"]["thinkTimeMs"];
+        if (config["engine"].contains("depth"))
+          depth = config["engine"]["depth"];
+      }
+    }
+    catch (...)
+    {
+    }
   }
 
-  const char *envEngine = std::getenv("STOCKFISH_PATH");
-  if (envEngine)
+  std::vector<std::thread> botThreads;
+
+  if (!lichessToken.empty())
   {
-    enginePath = envEngine;
+    std::cout << "Starting Lichess Platform Thread..." << std::endl;
+    botThreads.emplace_back(
+        [=]()
+        {
+          std::unique_ptr<IPlatform> platform = std::make_unique<LichessPlatform>(lichessToken);
+          Bot bot(std::move(platform), enginePath, elo, thinkTimeMs, depth);
+          bot.run();
+        });
   }
 
-  // Method 1: Command Line Arguments
-  // (This is the highest priority and will override both Environment Variables and the Hardcoded token)
-  if (argc > 1)
+  if (!discordToken.empty())
   {
-    token = argv[1];
+    std::cout << "Starting Discord (and Local Web API) Platform on main thread..." << std::endl;
+    std::unique_ptr<IPlatform> platform = std::make_unique<DiscordPlatform>(discordToken);
+    Bot bot(std::move(platform), enginePath, elo, thinkTimeMs, depth);
+    bot.run(); // This blocks the main thread
   }
-  if (argc > 2)
+  else
   {
-    enginePath = argv[2];
-  }
-
-  if (token == "YOUR_LICHESS_BOT_TOKEN_HERE" || token.empty())
-  {
-    std::cerr << "Usage: " << argv[0] << " <lichess_bot_token> [stockfish_path]" << std::endl;
-    std::cerr << "Alternatively, hardcode the token in src/main.cpp!" << std::endl;
-    return 1;
+    std::cout << "Discord token not found. Starting Local Web Platform on main thread..." << std::endl;
+    std::unique_ptr<IPlatform> platform = std::make_unique<LocalWebPlatform>();
+    Bot bot(std::move(platform), enginePath, elo, thinkTimeMs, depth);
+    bot.run(); // This blocks the main thread
   }
 
-  if (enginePath.empty())
+  for (auto &t : botThreads)
   {
-    enginePath = "stockfish"; // default to PATH
+    if (t.joinable())
+      t.join();
   }
-
-  Bot bot(token, enginePath);
-  bot.run();
 
   return 0;
 }

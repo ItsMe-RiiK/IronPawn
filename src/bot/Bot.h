@@ -2,29 +2,33 @@
 #define BOT_H
 
 #include "../engine/UciEngine.h"
-#include "../http/LichessClient.h"
+#include "../platform/IPlatform.h"
 
 #include <memory>
+#include <mutex>
 #include <string>
+#include <unordered_map>
 
 class Bot
 {
 public:
-  Bot(const std::string &token, const std::string &enginePath);
+  Bot(std::unique_ptr<IPlatform> platform, const std::string &enginePath, int elo, int thinkTimeMs, int depth);
   ~Bot();
 
   void run();
 
 private:
-  std::string token;
+  std::unique_ptr<IPlatform> platform;
   std::string enginePath;
-  std::unique_ptr<LichessClient> client;
+  int elo;
+  int thinkTimeMs;
+  int depth;
 
-  // Handles the event stream (challenges, gameStarts)
-  bool handleEvent(const std::string &eventJson, const std::string &botId);
+  std::unordered_map<std::string, std::shared_ptr<UciEngine>> activeGames;
+  std::mutex gamesMutex;
 
-  // Handles an individual game stream
-  void playGame(const std::string &gameId, const std::string &botId);
+  void handleEvent(const ChessEvent &evt);
+  void processMoveAsync(std::string gameId, std::string moves);
 };
 
 #endif // BOT_H

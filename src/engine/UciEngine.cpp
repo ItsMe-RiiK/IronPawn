@@ -4,6 +4,7 @@
 #include <string.h>
 
 #ifndef _WIN32
+#include <fcntl.h>
 #include <sys/wait.h>
 #include <unistd.h>
 #endif
@@ -141,6 +142,9 @@ bool UciEngine::start()
   {
     close(inPipe[0]);
     close(outPipe[1]);
+
+    fcntl(inPipe[1], F_SETFD, FD_CLOEXEC);
+    fcntl(outPipe[0], F_SETFD, FD_CLOEXEC);
 
     sendCommand("uci");
     while (true)

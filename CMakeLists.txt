@@ -3,6 +3,7 @@ project(IronPawn)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Find libcurl
 find_package(CURL REQUIRED)
@@ -19,8 +20,34 @@ find_package(nlohmann_json REQUIRED)
 # Source files
 file(GLOB_RECURSE SOURCES "src/*.cpp")
 
+# Find Discord C++ Library (DPP)
+find_package(dpp QUIET)
+if (dpp_FOUND)
+    message(STATUS "Found installed DPP")
+    set(DPP_TARGET dpp::dpp)
+else()
+    message(STATUS "DPP not found, fetching via CMake FetchContent... This will take a few minutes!")
+    include(FetchContent)
+    FetchContent_Declare(
+      dpp
+      GIT_REPOSITORY https://github.com/brainboxdotcc/DPP.git
+      GIT_TAG        v10.0.35
+    )
+    FetchContent_MakeAvailable(dpp)
+    set(DPP_TARGET dpp)
+endif()
+
+# Find httplib (for Local Web Server)
+message(STATUS "Fetching cpp-httplib via CMake FetchContent...")
+FetchContent_Declare(
+    httplib
+    GIT_REPOSITORY https://github.com/yhirose/cpp-httplib.git
+    GIT_TAG        v0.15.3
+)
+FetchContent_MakeAvailable(httplib)
+
 # Executable
 add_executable(IronPawn ${SOURCES})
 
 # Link libraries
-target_link_libraries(IronPawn PRIVATE ${CURL_LIBRARIES} nlohmann_json::nlohmann_json)
+target_link_libraries(IronPawn PRIVATE ${CURL_LIBRARIES} nlohmann_json::nlohmann_json httplib::httplib ${DPP_TARGET})

@@ -2,7 +2,6 @@
 #define UCI_ENGINE_H
 
 #include <string>
-#include <vector>
 
 #ifdef _WIN32
 #include <windows.h>
