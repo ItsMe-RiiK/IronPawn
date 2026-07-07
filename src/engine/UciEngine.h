@@ -1,6 +1,7 @@
 #ifndef UCI_ENGINE_H
 #define UCI_ENGINE_H
 
+#include <mutex>
 #include <string>
 
 #ifdef _WIN32
@@ -30,6 +31,7 @@ public:
 
 private:
   std::string enginePath;
+  std::mutex engineMutex;
 
 #ifdef _WIN32
   HANDLE hChildStd_IN_Rd = NULL;

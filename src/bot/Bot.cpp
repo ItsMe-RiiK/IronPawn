@@ -49,8 +49,20 @@ void Bot::handleEvent(const ChessEvent &evt)
       engine->setElo(gameElo); // Use dynamic ELO if provided, else use base config ELO
       engine->sendCommand("ucinewgame");
 
-      std::lock_guard<std::mutex> lock(gamesMutex);
-      activeGames[evt.gameId] = engine;
+      std::shared_ptr<UciEngine> oldEngine;
+      {
+        std::lock_guard<std::mutex> lock(gamesMutex);
+        if (activeGames.find(evt.gameId) != activeGames.end())
+        {
+          oldEngine = activeGames[evt.gameId];
+        }
+        activeGames[evt.gameId] = engine;
+      }
+
+      if (oldEngine)
+      {
+        oldEngine->stop(); // Force abort the old engine's thinking so it doesn't pollute the new game
+      }
       std::cout << "Engine successfully assigned to game " << evt.gameId << " with ELO " << gameElo << std::endl;
 
       // If human chose Black, the bot must play White and make the first move immediately!

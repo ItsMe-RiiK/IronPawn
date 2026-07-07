@@ -236,12 +236,17 @@ std::string UciEngine::readLine()
 #else
   if (outPipe[0] == -1)
     return result;
-  while (read(outPipe[0], &c, 1) > 0)
+  int ret;
+  while ((ret = read(outPipe[0], &c, 1)) > 0)
   {
     if (c == '\n')
       break;
     if (c != '\r')
       result += c;
+  }
+  if (ret < 0)
+  {
+    std::cerr << "[UciEngine] read failed with errno " << errno << ": " << strerror(errno) << std::endl;
   }
 #endif
   return result;
@@ -260,17 +265,26 @@ void UciEngine::setSkillLevel(int level)
 
 std::string UciEngine::getBestMove(const std::string &position, int movetimeMs, int depth)
 {
-  sendCommand("position " + position);
+  std::lock_guard<std::mutex> lock(engineMutex);
+
+  std::string posCmd = "position " + position;
+  std::cout << "[UciEngine] Sending: " << posCmd << std::endl;
+  sendCommand(posCmd);
 
   std::string goCommand = "go";
-  if (depth > 0)
-  {
-    goCommand += " depth " + std::to_string(depth);
-  }
+
+  // Stockfish can behave unpredictably if both depth and movetime are provided.
+  // It will often ignore movetime to reach the target depth, causing very long thinking times.
+  // prioritizing movetime if it's strictly greater than 0.
   if (movetimeMs > 0)
   {
     goCommand += " movetime " + std::to_string(movetimeMs);
   }
+  else if (depth > 0)
+  {
+    goCommand += " depth " + std::to_string(depth);
+  }
+  std::cout << "[UciEngine] Sending: " << goCommand << std::endl;
   sendCommand(goCommand);
 
   int emptyCount = 0;

@@ -85,6 +85,31 @@ void DiscordPlatform::startListening(std::function<void(const ChessEvent &)> cal
              res.set_content(R"({"status":"ok"})", "application/json");
            });
 
+  svr.Post("/api/end",
+           [this](const httplib::Request &req, httplib::Response &res)
+           {
+             try
+             {
+               auto body = nlohmann::json::parse(req.body);
+               std::string gameId = body.value("gameId", "local_web");
+               {
+                 std::lock_guard<std::mutex> lock(gamesMutex);
+                 activeGames.erase(gameId);
+                 latestBotMoves.erase(gameId);
+               }
+               ChessEvent evt;
+               evt.type = ChessEventType::GAME_ENDED;
+               evt.gameId = gameId;
+               evt.status = "abandoned";
+               if (eventCallback)
+                 eventCallback(evt);
+             }
+             catch (...)
+             {
+             }
+             res.set_content(R"({"status":"ok"})", "application/json");
+           });
+
   svr.Get("/api/status",
           [this](const httplib::Request &req, httplib::Response &res)
           {
