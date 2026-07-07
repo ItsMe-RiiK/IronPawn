@@ -121,15 +121,16 @@
         <h1>IRONPAWN</h1>
         <div id="board"></div>
         <div class="controls">
-            <div style="display: flex; gap: 15px; margin-bottom: 15px; align-items: center; justify-content: center; color: #fff;">
-                <label style="font-weight: bold;">Team: 
+            <div
+                style="display: flex; gap: 15px; margin-bottom: 15px; align-items: center; justify-content: center; color: #fff;">
+                <label style="font-weight: bold;">Team:
                     <select id="playerSide" style="padding: 5px; border-radius: 4px; border: none;">
                         <option value="white">White</option>
                         <option value="black">Black</option>
                         <option value="random">Random</option>
                     </select>
                 </label>
-                <label style="display: flex; align-items: center; gap: 10px; font-weight: bold;">Stockfish ELO: 
+                <label style="display: flex; align-items: center; gap: 10px; font-weight: bold;">Stockfish ELO:
                     <span id="eloValue" style="min-width: 40px; text-align: right;">1500</span>
                     <input type="range" id="eloSlider" min="1320" max="3190" value="1500" style="cursor: pointer;">
                 </label>
@@ -157,10 +158,21 @@
         var animatingSince = 0;
 
         const params = new URLSearchParams(window.location.search);
-        let gameId = params.get('gameId') || "local_web";
+        let gameId = params.get('gameId');
+        if (!gameId) {
+            // Generate a unique session ID so multiple users don't overwrite each other's games
+            gameId = "web_" + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+        }
         const fenParam = params.get('fen');
         const movesParam = params.get('moves');
         const isScreenshot = params.has('screenshot');
+
+        // Gracefully kill the background engine if the user closes the window
+        window.addEventListener('beforeunload', function () {
+            if (gameId) {
+                navigator.sendBeacon('/api/end', JSON.stringify({ gameId: gameId }));
+            }
+        });
 
         if (isScreenshot) {
             $('h1').hide();
@@ -205,6 +217,7 @@
                 } else {
                     $('#status').text("Game Over: Draw!");
                 }
+                fetch('/api/end', { method: 'POST', body: JSON.stringify({ gameId: gameId }) }).catch(e => { });
             }
         }
 
@@ -314,7 +327,7 @@
             isAnimating = false;
         }
 
-        window.startGame = function() {
+        window.startGame = function () {
             try {
                 var elo = parseInt(document.getElementById('eloSlider').value);
                 var rawSide = document.getElementById('playerSide').value;
@@ -333,7 +346,7 @@
                 gameActive = true;
                 $('#status').text("Status: " + (isWhite ? "Your turn (White)" : "Stockfish is thinking (Black)...") + " [Click Registered!]");
 
-                fetch('/api/start', { 
+                fetch('/api/start', {
                     method: 'POST',
                     body: JSON.stringify({ gameId: gameId, elo: elo, isWhite: isWhite })
                 }).then(() => {
@@ -420,9 +433,9 @@
                     isAnimating = true;
                     animatingSince = Date.now();
                     board.move(selectedSquare + '-' + square); // Prevent ghost piece glitch by explicit move
-                    setTimeout(function() { 
+                    setTimeout(function () {
                         board.position(game.fen(), false); // Ensure accurate final state (e.g., promotions)
-                        isAnimating = false; 
+                        isAnimating = false;
                     }, 250);
 
                     playSound(move, game);
@@ -465,9 +478,9 @@
                             if (botMove !== null) {
                                 isAnimating = true;
                                 board.move(from + '-' + to); // Explicit move prevents ghost pieces
-                                setTimeout(function() { 
+                                setTimeout(function () {
                                     board.position(game.fen(), false); // Sync exact FEN safely
-                                    isAnimating = false; 
+                                    isAnimating = false;
                                 }, 250);
                                 playSound(botMove, game);
                                 highlightCheck();
@@ -515,41 +528,41 @@
                 fetch('/api/status?gameId=' + gameId)
                     .then(r => r.json())
                     .then(data => {
-                    if (data.currentMoves && data.currentMoves !== "") {
-                        gameActive = true;
-                        let moves = data.currentMoves.split(" ");
-                        game.reset();
-                        for (let m of moves) {
-                            if (m === "") continue;
-                            let from = m.substring(0, 2);
-                            let to = m.substring(2, 4);
-                            let promo = m.length > 4 ? m[4] : undefined;
-                            game.move({ from: from, to: to, promotion: promo });
-                        }
-                        board.position(game.fen(), false);
-                        highlightCheck();
-                        checkGameOver();
-                        
-                        document.getElementById('playerSide').disabled = true;
-                        document.getElementById('eloSlider').disabled = true;
-
-                        if (gameActive) {
-                            var rawSide = document.getElementById('playerSide').value;
-                            var botColor = (rawSide === 'random') ? (board.orientation() === 'white' ? 'b' : 'w') : (rawSide === 'white' ? 'b' : 'w');
-                            if (game.turn() === botColor) {
-                                $('#status').text("Status: Stockfish is thinking...");
-                            } else {
-                                $('#status').text("Status: Game restored. Your turn.");
+                        if (data.currentMoves && data.currentMoves !== "") {
+                            gameActive = true;
+                            let moves = data.currentMoves.split(" ");
+                            game.reset();
+                            for (let m of moves) {
+                                if (m === "") continue;
+                                let from = m.substring(0, 2);
+                                let to = m.substring(2, 4);
+                                let promo = m.length > 4 ? m[4] : undefined;
+                                game.move({ from: from, to: to, promotion: promo });
                             }
-                        }
+                            board.position(game.fen(), false);
+                            highlightCheck();
+                            checkGameOver();
 
-                        isAnimating = false;
-                        if (pollInterval) clearInterval(pollInterval);
-                        pollInterval = setInterval(pollBot, 500);
-                    } else {
-                        $('#status').text("Status: Click 'New Game' to start!");
-                    }
-                });
+                            document.getElementById('playerSide').disabled = true;
+                            document.getElementById('eloSlider').disabled = true;
+
+                            if (gameActive) {
+                                var rawSide = document.getElementById('playerSide').value;
+                                var botColor = (rawSide === 'random') ? (board.orientation() === 'white' ? 'b' : 'w') : (rawSide === 'white' ? 'b' : 'w');
+                                if (game.turn() === botColor) {
+                                    $('#status').text("Status: Stockfish is thinking...");
+                                } else {
+                                    $('#status').text("Status: Game restored. Your turn.");
+                                }
+                            }
+
+                            isAnimating = false;
+                            if (pollInterval) clearInterval(pollInterval);
+                            pollInterval = setInterval(pollBot, 500);
+                        } else {
+                            $('#status').text("Status: Click 'New Game' to start!");
+                        }
+                    });
             }
         }
 
@@ -557,7 +570,7 @@
             try {
                 const configRes = await fetch('/api/config');
                 const config = await configRes.json();
-                
+
                 if (config.clientId) {
                     const discordSdk = new DiscordSDK(config.clientId);
                     await discordSdk.ready();
@@ -572,15 +585,15 @@
                 // Fallback display
                 document.getElementById('status').innerText = "Status: SDK Initialization failed. " + e.toString();
             }
-            
+
             initializeGame();
         }
 
-        document.getElementById('eloSlider').addEventListener('input', function(e) {
+        document.getElementById('eloSlider').addEventListener('input', function (e) {
             document.getElementById('eloValue').innerText = e.target.value;
         });
 
-        document.getElementById('resignBtn').addEventListener('click', function() {
+        document.getElementById('resignBtn').addEventListener('click', function () {
             if (gameActive) {
                 gameActive = false;
                 $('#status').text("Status: You resigned. Change settings or click New Game.");
