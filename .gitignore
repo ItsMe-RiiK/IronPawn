@@ -1,2 +1,6 @@
 build/
+.cache/
+
 myapikeybot.txt
+compile_commands.json
+config.jsonc
