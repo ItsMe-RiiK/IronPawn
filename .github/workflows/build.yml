@@ -33,7 +33,7 @@ jobs:
 
     - name: Install dependencies via vcpkg
       run: |
-        vcpkg install curl nlohmann-json --triplet ${{ matrix.vcpkg_triplet }}
+        vcpkg install curl nlohmann-json dpp cpp-httplib --triplet ${{ matrix.vcpkg_triplet }}
 
     - name: Configure CMake
       run: cmake -B build -S . ${{ matrix.cmake_args }} -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
