@@ -1,15 +1,19 @@
 #include "DiscordPlatform.h"
 
+#include <cctype>
 #include <iostream>
 #include <nlohmann/json.hpp>
-#include <algorithm>
 
-static bool isValidUciMove(const std::string& move) {
-    if (move.empty() || move.length() < 4 || move.length() > 5) return false;
-    for (char c : move) {
-        if (!std::isalnum(c)) return false;
-    }
-    return true;
+static bool isValidUciMove(const std::string &move)
+{
+  if (move.empty() || move.length() < 4 || move.length() > 5)
+    return false;
+  for (char c : move)
+  {
+    if (!std::isalnum(c))
+      return false;
+  }
+  return true;
 }
 
 DiscordPlatform::DiscordPlatform(const std::string &token)
@@ -37,13 +41,16 @@ void DiscordPlatform::startListening(std::function<void(const ChessEvent &)> cal
              auto jsonReq = nlohmann::json::parse(req.body);
              std::string gameId = jsonReq.value("gameId", "local_web");
              int elo = jsonReq.value("elo", 1500);
-             if (elo < 0) elo = 0;
-             if (elo > 4000) elo = 4000;
+             if (elo < 0)
+               elo = 0;
+             if (elo > 4000)
+               elo = 4000;
              bool isWhite = jsonReq.value("isWhite", true);
 
              {
                std::lock_guard<std::mutex> lock(gamesMutex);
-               if (activeGames.find(gameId) == activeGames.end() && activeGames.size() >= 100) {
+               if (activeGames.find(gameId) == activeGames.end() && activeGames.size() >= 100)
+               {
                  res.status = 429;
                  res.set_content(R"({"status":"error", "message":"Server capacity reached. Try again later."})", "application/json");
                  return;
@@ -73,7 +80,8 @@ void DiscordPlatform::startListening(std::function<void(const ChessEvent &)> cal
                std::string move = body.value("move", "");
                std::string gameId = body.value("gameId", "local_web");
 
-               if (!isValidUciMove(move)) {
+               if (!isValidUciMove(move))
+               {
                  res.status = 400;
                  res.set_content(R"({"status":"error", "message":"Invalid move format."})", "application/json");
                  return;
@@ -168,7 +176,8 @@ void DiscordPlatform::startListening(std::function<void(const ChessEvent &)> cal
         {
           {
             std::lock_guard<std::mutex> lock(gamesMutex);
-            if (activeGames.find(channelId) == activeGames.end() && activeGames.size() >= 100) {
+            if (activeGames.find(channelId) == activeGames.end() && activeGames.size() >= 100)
+            {
               dpp::message msg(event.msg.channel_id, "Server is currently at maximum capacity. Please try again later.");
               event.reply(msg);
               return;
@@ -206,7 +215,8 @@ void DiscordPlatform::startListening(std::function<void(const ChessEvent &)> cal
         else if (content.find("!move ") == 0)
         {
           std::string move = content.substr(6); // Extract the move
-          if (!isValidUciMove(move)) {
+          if (!isValidUciMove(move))
+          {
             dpp::message msg(event.msg.channel_id, "Invalid move format. Please use UCI format (e.g., e2e4).");
             event.reply(msg);
             return;
