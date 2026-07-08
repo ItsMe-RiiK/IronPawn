@@ -20,6 +20,8 @@ find_package(nlohmann_json REQUIRED)
 # Source files
 file(GLOB_RECURSE SOURCES "src/*.cpp")
 
+include(FetchContent)
+
 # Find Discord C++ Library (DPP)
 find_package(dpp QUIET)
 if (dpp_FOUND)
@@ -27,7 +29,6 @@ if (dpp_FOUND)
     set(DPP_TARGET dpp::dpp)
 else()
     message(STATUS "DPP not found, fetching via CMake FetchContent... This will take a few minutes!")
-    include(FetchContent)
     FetchContent_Declare(
       dpp
       GIT_REPOSITORY https://github.com/brainboxdotcc/DPP.git
@@ -38,13 +39,18 @@ else()
 endif()
 
 # Find httplib (for Local Web Server)
-message(STATUS "Fetching cpp-httplib via CMake FetchContent...")
-FetchContent_Declare(
-    httplib
-    GIT_REPOSITORY https://github.com/yhirose/cpp-httplib.git
-    GIT_TAG        v0.15.3
-)
-FetchContent_MakeAvailable(httplib)
+find_package(httplib QUIET)
+if (httplib_FOUND)
+    message(STATUS "Found installed cpp-httplib")
+else()
+    message(STATUS "Fetching cpp-httplib via CMake FetchContent...")
+    FetchContent_Declare(
+        httplib
+        GIT_REPOSITORY https://github.com/yhirose/cpp-httplib.git
+        GIT_TAG        v0.15.3
+    )
+    FetchContent_MakeAvailable(httplib)
+endif()
 
 # Executable
 add_executable(IronPawn ${SOURCES})
