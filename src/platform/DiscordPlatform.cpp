@@ -159,7 +159,15 @@ void DiscordPlatform::startListening(std::function<void(const ChessEvent &)> cal
             res.set_content(response.dump(), "application/json");
           });
 
-  webThread = std::thread([this]() { svr.listen("0.0.0.0", 8080); });
+  int port = 8080;
+  if (const char* env_p = std::getenv("PORT")) {
+    try {
+      port = std::stoi(env_p);
+    } catch (...) {}
+  }
+  
+  webThread = std::thread([this, port]()
+                          { svr.listen("0.0.0.0", port); });
 
   bot->on_log(dpp::utility::cout_logger());
 
