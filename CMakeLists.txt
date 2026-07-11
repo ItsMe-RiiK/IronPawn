@@ -5,6 +5,11 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# Make the executable look for .so files in the same directory
+set(CMAKE_BUILD_RPATH "$ORIGIN")
+set(CMAKE_INSTALL_RPATH "$ORIGIN")
+set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
+
 # Find libcurl
 find_package(CURL REQUIRED)
 
@@ -29,8 +34,6 @@ if (dpp_FOUND)
     set(DPP_TARGET dpp::dpp)
 else()
     message(STATUS "DPP not found, fetching via CMake FetchContent... This will take a few minutes!")
-    set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
-    set(DPP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
     FetchContent_Declare(
       dpp
       GIT_REPOSITORY https://github.com/brainboxdotcc/DPP.git
