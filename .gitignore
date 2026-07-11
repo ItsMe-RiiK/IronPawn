@@ -4,3 +4,4 @@ build/
 myapikeybot.txt
 compile_commands.json
 config.jsonc
+log.txt
