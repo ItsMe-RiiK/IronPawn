@@ -29,6 +29,8 @@ if (dpp_FOUND)
     set(DPP_TARGET dpp::dpp)
 else()
     message(STATUS "DPP not found, fetching via CMake FetchContent... This will take a few minutes!")
+    set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+    set(DPP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
     FetchContent_Declare(
       dpp
       GIT_REPOSITORY https://github.com/brainboxdotcc/DPP.git
