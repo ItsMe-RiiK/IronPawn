@@ -10,41 +10,6 @@ permissions:
   contents: write
 
 jobs:
-  build_windows:
-    name: Build Windows (${{ matrix.arch }})
-    runs-on: windows-latest
-    strategy:
-      matrix:
-        include:
-          - arch: x64
-            cmake_args: "-A x64"
-            vcpkg_triplet: "x64-windows"
-
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Set up CMake
-      uses: lukka/get-cmake@latest
-
-    - name: Install dependencies via vcpkg
-      run: |
-        vcpkg install curl nlohmann-json dpp cpp-httplib --triplet ${{ matrix.vcpkg_triplet }}
-
-    - name: Configure CMake
-      run: cmake -B build -S . ${{ matrix.cmake_args }} -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
-
-    - name: Build
-      run: cmake --build build --config Release
-
-    - name: Rename executable
-      run: Move-Item -Path build\Release\IronPawn.exe -Destination build\Release\IronPawn-Windows-${{ matrix.arch }}.exe
-
-    - name: Upload Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: IronPawn-Windows-${{ matrix.arch }}
-        path: build/Release/IronPawn-Windows-${{ matrix.arch }}.exe
-
   build_linux:
     name: Build Linux (x64)
     runs-on: ubuntu-latest
@@ -78,7 +43,7 @@ jobs:
 
   release:
     name: Create Release
-    needs: [build_windows, build_linux]
+    needs: [build_linux]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     steps:
@@ -93,5 +58,4 @@ jobs:
         with:
           generate_release_notes: true
           files: |
-            artifacts/IronPawn-Windows-*.exe
             artifacts/IronPawn-Linux-*.tar.gz
