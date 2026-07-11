@@ -34,7 +34,8 @@ jobs:
       run: |
         cd build
         find . -name "libdpp.so*" -exec cp {} . \;
-        tar -czvf IronPawn-Linux-x64.tar.gz IronPawn libdpp.so*
+        cp -r ../public .
+        tar -czvf IronPawn-Linux-x64.tar.gz IronPawn libdpp.so* public
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
