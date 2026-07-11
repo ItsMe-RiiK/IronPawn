@@ -166,8 +166,13 @@ void DiscordPlatform::startListening(std::function<void(const ChessEvent &)> cal
     } catch (...) {}
   }
   
-  webThread = std::thread([this, port]()
-                          { svr.listen("0.0.0.0", port); });
+  std::string ip = "0.0.0.0";
+  if (const char* env_ip = std::getenv("IP")) {
+    ip = env_ip;
+  }
+  
+  webThread = std::thread([this, port, ip]()
+                          { svr.listen(ip.c_str(), port); });
 
   bot->on_log(dpp::utility::cout_logger());
 
