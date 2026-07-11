@@ -19,9 +19,6 @@ jobs:
           - arch: x64
             cmake_args: "-A x64"
             vcpkg_triplet: "x64-windows"
-          - arch: x86
-            cmake_args: "-A Win32"
-            vcpkg_triplet: "x86-windows"
 
     steps:
     - uses: actions/checkout@v4
