@@ -254,6 +254,8 @@ std::string UciEngine::readLine()
 
 void UciEngine::setElo(int elo)
 {
+  sendCommand("setoption name Hash value 1"); // 1MB Hash to survive 256MB RAM limits
+  sendCommand("setoption name Threads value 1"); // 1 Thread for 0.25 CPU environments
   sendCommand("setoption name UCI_LimitStrength value true");
   sendCommand("setoption name UCI_Elo value " + std::to_string(elo));
 }
