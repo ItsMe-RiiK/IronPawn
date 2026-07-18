@@ -170,7 +170,7 @@
         // Gracefully kill the background engine if the user closes the window
         window.addEventListener('beforeunload', function () {
             if (gameId) {
-                navigator.sendBeacon('/api/end', JSON.stringify({ gameId: gameId }));
+                navigator.sendBeacon('./api/end', JSON.stringify({ gameId: gameId }));
             }
         });
 
@@ -217,7 +217,7 @@
                 } else {
                     $('#status').text("Game Over: Draw!");
                 }
-                fetch('/api/end', { method: 'POST', body: JSON.stringify({ gameId: gameId }) }).catch(e => { });
+                fetch('./api/end', { method: 'POST', body: JSON.stringify({ gameId: gameId }) }).catch(e => { });
             }
         }
 
@@ -315,7 +315,7 @@
 
             $('#status').text("Status: Stockfish is thinking...");
 
-            fetch('/api/move', {
+            fetch('./api/move', {
                 method: 'POST',
                 body: JSON.stringify({ move: engineMove, gameId: gameId })
             });
@@ -346,7 +346,7 @@
                 gameActive = true;
                 $('#status').text("Status: " + (isWhite ? "Your turn (White)" : "Stockfish is thinking (Black)...") + " [Click Registered!]");
 
-                fetch('/api/start', {
+                fetch('./api/start', {
                     method: 'POST',
                     body: JSON.stringify({ gameId: gameId, elo: elo, isWhite: isWhite })
                 }).then(() => {
@@ -445,7 +445,7 @@
                     if (move.promotion) engineMove += move.promotion;
 
                     $('#status').text("Status: Stockfish is thinking...");
-                    fetch('/api/move', { method: 'POST', body: JSON.stringify({ move: engineMove, gameId: gameId }) });
+                    fetch('./api/move', { method: 'POST', body: JSON.stringify({ move: engineMove, gameId: gameId }) });
                     selectedSquare = null;
                 } else {
                     // Clicked an empty/enemy square that is invalid, deselect
@@ -457,7 +457,7 @@
         }, true); // Use capture phase!
 
         function pollBot() {
-            fetch('/api/status?gameId=' + gameId)
+            fetch('./api/status?gameId=' + gameId)
                 .then(r => r.json())
                 .then(data => {
                     if (data.latestBotMove && data.latestBotMove !== "") {
@@ -525,7 +525,7 @@
 
             if (!isScreenshot) {
                 // On page load, attempt to restore an active game
-                fetch('/api/status?gameId=' + gameId)
+                fetch('./api/status?gameId=' + gameId)
                     .then(r => r.json())
                     .then(data => {
                         if (data.currentMoves && data.currentMoves !== "") {
@@ -568,7 +568,7 @@
 
         async function initDiscord() {
             try {
-                const configRes = await fetch('/api/config');
+                const configRes = await fetch('./api/config');
                 const config = await configRes.json();
 
                 if (config.clientId) {
