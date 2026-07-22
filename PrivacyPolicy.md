@@ -10,8 +10,7 @@ To run the chess game and its features, IronPawn collects only the following min
 
 2. How Is the Data Used?
 The data collected is used exclusively for the bot’s core functionality, namely:
-    - Starting and processing chess games between users.
-    - Storing and displaying leaderboards or player statistics.
+    - Starting and processing chess games.
 
 3. Data Sharing
 We do not sell, rent, or share user data with any third parties. Data is processed solely by the bot for gameplay purposes.
